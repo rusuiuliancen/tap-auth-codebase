@@ -1,9 +1,5 @@
 
 using System.Text;
-using DataAccessLayer.Repository;
-using DataAccessLayer;
-using BusinessLayer.Contracts;
-using BusinessLayer.Services;
 using AspNetCoreRateLimit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -16,6 +12,16 @@ namespace WebAPI
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+
+            builder.Services.AddCors(option =>
+            {
+                option.AddPolicy("Default", builder =>
+                {
+                    builder.AllowAnyOrigin()
+                        .AllowAnyMethod()
+                        .AllowAnyHeader();
+                });
+            });
 
             // Add services to the container.
 
@@ -78,15 +84,6 @@ namespace WebAPI
                 });
             });
 
-            //Repository
-            builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
-
-            //Services
-            builder.Services.AddScoped(typeof(ITestService), typeof(TestService));
-
-            //Database
-            builder.Services.AddDbContext<MyDbContext>();
-
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
@@ -101,6 +98,7 @@ namespace WebAPI
             app.UseAuthentication();
             app.UseAuthorization();
             app.UseIpRateLimiting();
+            app.UseCors("Default");
 
             app.MapControllers();
 

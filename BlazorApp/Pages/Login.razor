@@ -1,0 +1,94 @@
+﻿@page "/login"
+@using Blazored.LocalStorage
+@inject ILocalStorageService localstorage;
+@inject NavigationManager NavigationManager
+@using Newtonsoft.Json;
+@using System.Net.Http.Headers
+
+
+@inject HttpClient Http
+<h3>Login</h3>
+
+@if (isAuthenticated)
+{
+    <p style="color: forestgreen;">You're logged in.</p>
+    <form @onsubmit="LogoutForm">
+        <button type="submit">Logout</button>
+    </form>
+}
+
+@if (!isAuthenticated)
+{
+    @if (errorMessage != null)
+    {
+        <p style="color: red;">@errorMessage</p>
+    }
+
+    <form @onsubmit="SubmitForm">
+        <div>
+            <label for="username">Username:</label>
+            <input type="text" id="username" @bind="username"/>
+        </div>
+        <div>
+            <label for="password">Password:</label>
+            <input type="password" id="password" @bind="password"/>
+        </div>
+        <button type="submit">Login</button>
+    </form>
+}
+@code {
+    private string username;
+    private string password;
+    private string errorMessage;
+    private bool isAuthenticated;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var savedToken = await localstorage.GetItemAsStringAsync("jwtToken");
+        Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", savedToken);
+
+        var resp = await Http.GetAsync("user/check");
+
+        if (resp.IsSuccessStatusCode)
+        {
+            isAuthenticated = true;
+        }
+    }
+
+    private async Task LogoutForm()
+    {
+        await localstorage.RemoveItemAsync("jwtToken");
+        NavigationManager.NavigateTo("/login", forceLoad:true);
+    }
+
+    private async Task SubmitForm()
+    {
+        try
+        {
+            var loginData = new { Username = username, Password = password };
+
+            var response = await Http.PostAsJsonAsync("/user/login", loginData);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var jwtToken = JsonConvert.DeserializeObject<LoginResponse>(await response.Content.ReadAsStringAsync());
+                await localstorage.SetItemAsStringAsync("jwtToken", jwtToken?.Token ?? "-");
+                NavigationManager.NavigateTo("/login", forceLoad:true);
+            }
+            else
+            {
+                errorMessage = "Something went wrong.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred while processing your request.";
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    public class LoginResponse
+    {
+        public string Token { get; set; }
+    }
+}
